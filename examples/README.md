@@ -38,3 +38,16 @@ Demo complete. The throwaway copy is at examples/fixture-repo/ (git-ignored, reg
   and says so explicitly instead of silently trusting a graph that no longer describes the build.
 
 Re-run it yourself: `npm run build && bash examples/demo.sh`.
+
+## Flashy version (for a GIF)
+
+`wow_demo.py` runs the exact same real CLI against the exact same real fixture — it just
+presents it with animation and color (via [rich](https://github.com/Textualize/rich)) for
+recording a terminal GIF. Nothing in it is scripted or fabricated; every number comes straight
+out of the same `sts select --json` call.
+
+```bash
+npm run build
+pip install rich
+python3 examples/wow_demo.py
+```
