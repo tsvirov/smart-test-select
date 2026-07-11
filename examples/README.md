@@ -51,3 +51,15 @@ npm run build
 pip install rich
 python3 examples/wow_demo.py
 ```
+
+## GIF (used in the top-level README)
+
+`make_gif.py` reuses `wow_demo.py`'s real CLI run and rasterizes it straight to
+`wow-demo.gif` with Pillow — no screen recorder, no ffmpeg/asciinema/vhs (none of which are
+available without Homebrew in this environment).
+
+```bash
+npm run build
+pip install rich pillow
+python3 examples/make_gif.py
+```

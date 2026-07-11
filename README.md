@@ -8,6 +8,11 @@
 
 **Stop running 100% of your tests for a 2% diff.**
 
+![smart-test-select: 5 of 8 tests selected, then a config change forces safe mode](./examples/wow-demo.gif)
+
+*Not staged — every line above comes from a real `sts select --json` run against the repo's own
+fixture (see [`examples/make_gif.py`](./examples/make_gif.py)).*
+
 ## Try it in 60 seconds
 
 ```bash
