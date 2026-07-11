@@ -1,0 +1,55 @@
+{
+  "name": "smart-test-select",
+  "version": "0.1.0",
+  "description": "Instead of running the whole suite on every PR, analyze the diff's dependency graph and propose the minimal set of tests actually at risk — with an LLM fallback for dynamic-import edge cases the static graph can't resolve.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "author": "Ilya Tsvirov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tsvirov/smart-test-select.git"
+  },
+  "homepage": "https://github.com/tsvirov/smart-test-select#readme",
+  "bugs": {
+    "url": "https://github.com/tsvirov/smart-test-select/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "smart-test-select": "./dist/cli.js",
+    "sts": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "action.yml"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "ts-morph": "^24.0.0",
+    "commander": "^13.0.0",
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "eslint": "^9.17.0",
+    "@eslint/js": "^9.17.0",
+    "typescript-eslint": "^8.19.1",
+    "tsup": "^8.3.5",
+    "vitest": "^2.1.8"
+  }
+}

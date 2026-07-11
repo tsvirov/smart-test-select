@@ -1,0 +1,85 @@
+name: 'Smart Test Select'
+description: "Instead of running the whole suite on every PR, analyze the diff's dependency graph and propose the minimal set of tests actually at risk."
+author: 'Ilya Tsvirov'
+branding:
+  icon: 'filter'
+  color: 'purple'
+
+inputs:
+  base:
+    description: 'Git ref to diff against'
+    required: false
+    default: 'main'
+  runner-args:
+    description: 'Test runner command to run with the selection appended, e.g. "npx vitest run"'
+    required: false
+    default: ''
+  llm-base-url:
+    description: 'OpenAI-compatible base URL to enable the LLM fallback for unresolved dynamic imports (e.g. http://localhost:11434/v1 for Ollama)'
+    required: false
+    default: ''
+  llm-model:
+    description: 'Model name to use with llm-base-url'
+    required: false
+    default: 'gpt-4o-mini'
+  comment-pr:
+    description: 'Post a PR comment summarizing the selection'
+    required: false
+    default: 'true'
+
+outputs:
+  mode:
+    description: '"selected" or "safe-mode"'
+    value: ${{ steps.select.outputs.mode }}
+  selected-count:
+    description: 'Number of tests selected (0 in safe-mode)'
+    value: ${{ steps.select.outputs.selected-count }}
+  total-count:
+    description: 'Total number of test files in the graph'
+    value: ${{ steps.select.outputs.total-count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build smart-test-select from the action's own checkout
+      shell: bash
+      run: |
+        set -e
+        cd "${{ github.action_path }}"
+        npm ci
+        npm run build
+
+    - name: Run selection against the consumer repo
+      id: select
+      shell: bash
+      run: |
+        set -e
+        ARGS=(select --base "${{ inputs.base }}" --json)
+        if [ -n "${{ inputs.llm-base-url }}" ]; then
+          ARGS+=(--llm-base-url "${{ inputs.llm-base-url }}" --llm-model "${{ inputs.llm-model }}")
+        fi
+        node "${{ github.action_path }}/dist/cli.js" "${ARGS[@]}" > sts-output.json
+        cat sts-output.json
+        MODE=$(node -pe "JSON.parse(require('fs').readFileSync('sts-output.json','utf8')).mode")
+        SELECTED_COUNT=$(node -pe "JSON.parse(require('fs').readFileSync('sts-output.json','utf8')).selected.length")
+        TOTAL_COUNT=$(node -pe "JSON.parse(require('fs').readFileSync('sts-output.json','utf8')).total")
+        echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+        echo "selected-count=$SELECTED_COUNT" >> "$GITHUB_OUTPUT"
+        echo "total-count=$TOTAL_COUNT" >> "$GITHUB_OUTPUT"
+
+    - name: Comment on the PR
+      if: ${{ inputs.comment-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -e
+        node -e "
+          const fs = require('fs');
+          const out = JSON.parse(fs.readFileSync('sts-output.json', 'utf8'));
+          const lines = out.mode === 'safe-mode'
+            ? ['**smart-test-select**: safe mode — running the full suite (' + out.total + ' tests)', '', ...out.safeModeReasons.map((r) => '- ' + r)]
+            : ['**smart-test-select**: ' + out.selected.length + ' of ' + out.total + ' tests affected', '', ...out.selected.map((t) => '- \`' + t + '\`')];
+          fs.writeFileSync('sts-comment.md', lines.join('\n'));
+        "
+        gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" -f body=@sts-comment.md
