@@ -64,6 +64,14 @@ describe('selectTests', () => {
     expect(result.selected).toEqual([]);
   });
 
+  it('terminates and selects nothing when the changed file sits in an import cycle no test reaches', () => {
+    const graph = buildGraph({ tsConfigFilePath: TSCONFIG, rootDir: FIXTURE_ROOT });
+    // cyclicA <-> cyclicB is a real mutual import; the reverse-reachability BFS's visited
+    // set must stop it from looping forever or double-selecting anything.
+    expect(selectTests({ graph, changedFiles: [abs('src/cyclicA.ts')] }).selected).toEqual([]);
+    expect(selectTests({ graph, changedFiles: [abs('src/cyclicB.ts')] }).selected).toEqual([]);
+  });
+
   it('ignores a changed file that is not a node in the graph', () => {
     const graph = buildGraph({ tsConfigFilePath: TSCONFIG, rootDir: FIXTURE_ROOT });
     const result = selectTests({ graph, changedFiles: [abs('src/data.json')] });

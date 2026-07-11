@@ -112,4 +112,110 @@ describe('CLI', () => {
 
     expect(process.exitCode).toBe(2);
   });
+
+  it('reports mode: selected with an empty selection when there is no diff', async () => {
+    const dir = setupRepo();
+    process.chdir(dir);
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => {
+      logs.push(String(msg));
+    });
+
+    await run(['node', 'sts', 'select', '--base', 'main', '--json']);
+
+    expect(process.exitCode).toBe(0);
+    const output = JSON.parse(logs.join('\n'));
+    expect(output).toMatchObject({ mode: 'selected', selected: [], total: 8 });
+  });
+
+  it('explain exits with code 2 when there is no tsconfig.json to analyze', async () => {
+    const dir = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'sts-cli-empty-')));
+    process.chdir(dir);
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await run(['node', 'sts', 'explain', 'tests/a.test.ts']);
+
+    expect(process.exitCode).toBe(2);
+  });
+
+  it('graph --stats prints file/edge/test/unresolved counts', async () => {
+    const dir = setupRepo();
+    process.chdir(dir);
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => {
+      logs.push(String(msg));
+    });
+
+    await run(['node', 'sts', 'graph', '--stats']);
+
+    expect(process.exitCode).toBe(0);
+    const text = logs.join('\n');
+    expect(text).toMatch(/files: 19/); // 11 src/*.ts + 8 tests/*.test.ts (src/data.json is not a .ts node)
+    expect(text).toMatch(/test files: 8/);
+    expect(text).toMatch(/unresolved: 1/); // src/nonLiteralDynamic.ts
+  });
+
+  it('graph (no --stats) lists every file path in the graph', async () => {
+    const dir = setupRepo();
+    process.chdir(dir);
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => {
+      logs.push(String(msg));
+    });
+
+    await run(['node', 'sts', 'graph']);
+
+    expect(process.exitCode).toBe(0);
+    expect(logs).toContain('src/a.ts');
+    expect(logs).toContain('tests/a.test.ts');
+  });
+
+  it('graph exits with code 2 when there is no tsconfig.json to analyze', async () => {
+    const dir = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'sts-cli-empty-')));
+    process.chdir(dir);
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await run(['node', 'sts', 'graph']);
+
+    expect(process.exitCode).toBe(2);
+  });
+
+  it('select --llm-base-url lets the judge add a test the static graph could not resolve', async () => {
+    const dir = setupRepo();
+    appendFileSync(path.join(dir, 'src/nonLiteralDynamic.ts'), '\nexport const marker = true;\n');
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '-q', '-m', 'change nonLiteralDynamic.ts']);
+    process.chdir(dir);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"affects": true, "confidence": 0.99, "reason": "stub"}' } }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => {
+      logs.push(String(msg));
+    });
+
+    await run(['node', 'sts', 'select', '--base', 'main', '--json', '--llm-base-url', 'http://localhost:11434/v1']);
+
+    expect(process.exitCode).toBe(0);
+    const output = JSON.parse(logs.join('\n'));
+    expect(output.mode).toBe('selected');
+    // the LLM judge was consulted for every test not already statically selected
+    expect(fetchMock).toHaveBeenCalled();
+    expect(output.selected).toEqual(
+      expect.arrayContaining(['tests/nonLiteralDynamic.test.ts', 'tests/aliasConsumer.test.ts', 'tests/untouched.test.ts']),
+    );
+
+    vi.unstubAllGlobals();
+  });
 });

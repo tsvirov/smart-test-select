@@ -53,6 +53,14 @@ describe('buildGraph', () => {
     expect(node.imports.size).toBe(0);
   });
 
+  it('handles a mutual (cyclic) import between two files without dropping either edge', () => {
+    const graph = buildGraph({ tsConfigFilePath: TSCONFIG, rootDir: FIXTURE_ROOT });
+    const a = [...graph.nodes.values()].find((n) => rel(n.filePath) === 'src/cyclicA.ts')!;
+    const b = [...graph.nodes.values()].find((n) => rel(n.filePath) === 'src/cyclicB.ts')!;
+    expect([...a.imports].map(rel)).toEqual(['src/cyclicB.ts']);
+    expect([...b.imports].map(rel)).toEqual(['src/cyclicA.ts']);
+  });
+
   it('does not add an edge for a bare (npm/node builtin) specifier', () => {
     const graph = buildGraph({ tsConfigFilePath: TSCONFIG, rootDir: FIXTURE_ROOT });
     const node = [...graph.nodes.values()].find((n) => rel(n.filePath) === 'tests/a.test.ts')!;
